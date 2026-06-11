@@ -1,117 +1,110 @@
-# Server Performance Monitoring — Data Analytics
+# Server Performance Monitoring
 
-**Author:** Chetna Radke  
-**Role:** Data Analyst  
-**Tools:** Python (Pandas), Power BI, Excel
+###### Author: Chetna Radke  
 
-\---
+###### Role: Data Analyst  
 
-## Project Overview
+###### Tools: Python (Pandas), Power BI, Excel, Azure 
 
-XYZ Corporation operates multiple virtual servers supporting critical applications. This project implements an end-to-end data pipeline that ingests raw server performance logs, applies data cleaning and transformation, models the data using a star schema, and delivers actionable insights through an interactive Power BI dashboard.
+###### 
 
 \---
 
-## Architecture
+XYZ Corporation had no central way to track how their servers were performing. Metrics like CPU usage, disk I/O, and downtime were sitting in raw Excel files across two monitoring stations with no visibility. I built an end-to-end data pipeline to fix that — from raw data to a Power BI dashboard stakeholders can actually use.
+
+\---
+
+## What this project does
+
+Takes raw server logs from two monitoring stations, cleans and joins them with server metadata, loads everything into a star schema, and delivers an interactive Power BI dashboard. The same pipeline was then migrated to Microsoft Azure for cloud-scale deployment.
+
+\---
+
+## Tech stack
+
+Python (Pandas) · Power BI · Azure Data Lake Storage Gen2 · Azure Data Factory · Azure Synapse Analytics · Excel · Parquet
+
+\---
+
+## Repository structure
 
 ```
-Raw Excel Files
-      ↓
-Python ETL Pipeline (Pandas)
-      ↓
-Cleaned Parquet Dataset
-      ↓
-Power BI Star Schema Model
-      ↓
-Interactive Power BI Dashboard
+server-performance-project/
+├── ETL\_PIPELINE.py                        # Local ETL — runs on your machine
+├── server\_data.xlsx                       # Raw source data
+├── cleaned\_server\_data.parquet            # ETL output
+├── server\_performance\_dashboard.pbix      # Power BI dashboard
+├── Case\_Study\_Documentation.docx          # Full project writeup
+├── requirements.txt                       # Python dependencies
+├── azure-pipeline/                        # Cloud version of the pipeline
+│   ├── etl\_azure.py                       # ETL adapted for Azure
+│   ├── create\_synapse\_tables.sql          # Star schema DDL
+│   ├── requirements\_azure.txt             # Azure dependencies
+│   └── README\_azure.md                    # Azure pipeline documentation
+└── screenshots/                           # Evidence of working pipeline
 ```
 
 \---
 
-## Project Files
-
-|File|Description|
-|-|-|
-|`ETL\_PIPELINE.py`|Python ETL script — ingests, cleans, enriches, and exports data|
-|`server\_data.xlsx`|Raw input data (Server\_Metadata, Station1 \& Station2 performance logs)|
-|`cleaned\_server\_data.parquet`|Output of the ETL pipeline — used by Power BI|
-|`server\_performance\_monitoring\_dashboard.pbix`|Power BI dashboard file|
-|`Case\_Study\_Documentation.docx`|Full case study writeup|
-|`requirements.txt`|Python dependencies|
-
-\---
-
-## How to Run
-
-**1. Install Python dependencies**
+## Local pipeline — how to run
 
 ```bash
 pip install -r requirements.txt
-```
-
-**2. Run the ETL pipeline**
-
-```bash
 python ETL\_PIPELINE.py
 ```
 
-This reads `server\_data.xlsx`, cleans the data, and outputs `cleaned\_server\_data.parquet`.
-
-**3. Open the dashboard**
-
-Open `server\_performance\_monitoring\_dashboard.pbix` in Power BI Desktop and refresh the data source to point to the generated `.parquet` file.
+Then open the `.pbix` file in Power BI Desktop and refresh.
 
 \---
 
-## Data Model — Star Schema
+## What the ETL does
 
-**Fact Table**
+The raw data had several issues that needed handling:
 
-* `FactServerPerformance` — CPU utilization, disk I/O, downtime hours, log date
-
-**Dimension Tables**
-
-* `DimServer` — OS type, cluster, administrator, server location
-* `DimDate` — date, month, quarter, year
-
-\---
-
-## ETL Pipeline Steps
-
-1. **Ingestion** — reads three Excel sheets (Server\_Metadata, Station1, Station2)
-2. **Cleaning** — removes irrelevant columns, drops rows with missing Server IDs, deduplicates on Server\_ID + timestamp
-3. **Imputation** — fills missing CPU and memory values with the median
-4. **Enrichment** — joins performance logs with server metadata
-5. **Export** — saves the final dataset as Parquet for efficient downstream use
+* Station 1 and Station 2 logs were in separate sheets — concatenated them
+* Some rows had no Server\_ID — dropped those
+* CPU and memory had nulls — filled with column median
+* Duplicate entries for the same server at the same timestamp — deduplicated
+* Joined performance logs with server metadata on Server\_ID
+* Saved output as Parquet — faster to read, smaller file size than CSV
 
 \---
 
-## Key Business Insights
+## Data model — star schema
 
-* A small subset of servers contributes disproportionately to overall downtime
-* Performance trends vary by time period, indicating potential seasonal patterns
-* Downtime differs by OS type, highlighting platform-level considerations
-* Cluster-based filtering enables prioritized infrastructure optimization
+`FactServerPerformance` holds the metrics: CPU %, memory %, disk I/O, network traffic in/out, uptime hours, downtime hours. One row per server per log entry.
+
+`DimServer` holds server attributes: OS type, cluster, location, administrator.
+
+`DimDate` holds the calendar hierarchy for time-based filtering.
 
 \---
 
-## Scalability \& Future Enhancements
+## Dashboard highlights
 
-This solution is designed for extension into a cloud-native architecture:
+* 4 KPI cards: total servers, total downtime hours, average CPU, average disk I/O
+* Line chart: CPU utilization trend over time
+* Bar chart: top servers by downtime
+* Donut chart: downtime split by OS type
+* Slicers: filter by year, month, OS type, server cluster
 
-|Component|Current|Future (Azure)|
-|-|-|-|
-|Orchestration|Manual script execution|Azure Data Factory|
-|Storage|Local / GitHub|Azure Data Lake Storage Gen2|
-|Processing|Pandas (local)|Azure Synapse Analytics|
-|Scheduling|Manual|ADF Pipelines (automated)|
-|Monitoring|Power BI manual refresh|Power BI Premium auto-refresh|
+\---
 
-Additional future enhancements:
+## Azure pipeline
 
-* Real-time streaming ingestion
-* Anomaly detection and automated alerting
-* Incremental data loads instead of full refresh
+The `azure-pipeline/` folder contains the full cloud migration of this project. See `azure-pipeline/README\_azure.md` for details.
+
+**Services used:** Azure Data Lake Storage Gen2 · Azure Data Factory · Azure Synapse Analytics
+
+**What was achieved on Azure free tier:**
+
+* Raw Excel file uploaded to Data Lake Storage Gen2 (raw container)
+* ETL pipeline executed inside Azure Synapse Notebook — 4940 rows processed
+* Cleaned Parquet and CSV files saved to Data Lake processed container
+* Star schema tables created in Azure Synapse dedicated SQL pool
+* Azure Data Factory pipeline created with daily schedule trigger
+
+**Known limitation:** Automated Spark-to-Synapse SQL loading and Power BI cloud refresh require an organisational Microsoft account, which is not available on a personal Azure free trial. Data is available in the Data Lake processed container as Parquet and CSV for downstream use.
 
 \---
 
@@ -124,5 +117,5 @@ openpyxl
 pyarrow
 ```
 
-Python 3.8 or higher recommended.
+Python 3.8+
 
